@@ -1,4 +1,4 @@
-# Digital Product Web App with End-to-End DevOps Pipeline
+# Digital Art Product Web App with End-to-End DevOps Pipeline
 
 ## A Django-based e-commerce application for selling and managing digital art products only, with a fully automated end-to-end DevOps pipeline for continuous integration, testing, and deployment.
 ---
