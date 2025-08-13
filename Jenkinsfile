@@ -3,8 +3,6 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials') // Set in Jenkins
-        DOCKERHUB_USERNAME = "${DOCKERHUB_CREDENTIALS_USR}"
-        DOCKERHUB_PASSWORD = "${DOCKERHUB_CREDENTIALS_PSW}"
         DOCKER_IMAGE = "marywam/digital_product"
     }
 
@@ -18,6 +16,9 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
+                 # Install required system package
+                   sudo apt-get update
+                   sudo apt-get install -y python3.13.5-venv
                 python3 -m venv virtual
                 source virtual/bin/activate
                 pip install --upgrade pip
@@ -43,16 +44,17 @@ pipeline {
             }
         }
 
-        stage('Push to DockerHub') {
-            steps {
-                script {
-                    sh """
-                    echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
-                    docker push ${DOCKER_IMAGE}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}
-                    """
-                }
-            }
+      stage('Push to DockerHub') {
+    steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+            sh """
+                echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+                docker push ${DOCKER_IMAGE}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}
+            """
         }
+    }
+}
+
     }
 
     post {
