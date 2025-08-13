@@ -1,6 +1,10 @@
 pipeline {
-    agent any
-
+    agent {
+        docker {
+            image 'python:3.11-slim'
+            args '-u root'  // run as root so pip installs work
+        }
+    }
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials') // Set in Jenkins
         DOCKER_IMAGE = "marywam/digital_product"
@@ -16,11 +20,8 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                 # Install required system package
-                    apt-get update
-                    apt-get install -y python3-venv
-                python3 -m venv virtual
-                source virtual/bin/activate
+                 python3 -m venv virtual
+                    . virtual/bin/activate
                 pip install --upgrade pip
                 pip install -r requirements.txt
                 '''
@@ -30,7 +31,7 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh '''
-                source virtual/bin/activate
+                  . virtual/bin/activate
                 python manage.py test
                 '''
             }
