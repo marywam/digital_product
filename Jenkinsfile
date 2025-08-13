@@ -5,8 +5,9 @@ pipeline {
             args '-u root'  // run as root so pip installs work
         }
     }
+
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials') // Set in Jenkins
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKER_IMAGE = "marywam/digital_product"
     }
 
@@ -20,10 +21,10 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                 python3 -m venv virtual
-                    . virtual/bin/activate
-                pip install --upgrade pip
-                pip install -r requirements.txt
+                    set -e  # stop on first error
+                    apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
                 '''
             }
         }
@@ -31,39 +32,38 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh '''
-                  . virtual/bin/activate
-                python manage.py test
+                    set -e
+                    python manage.py test
                 '''
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh "docker build -t ${DOCKER_IMAGE}:${env.BRANCH_NAME}-${env.BUILD_NUMBER} ."
-                }
+                sh '''
+                    docker build -t ${DOCKER_IMAGE}:${env.BRANCH_NAME}-${env.BUILD_NUMBER} .
+                '''
             }
         }
 
-      stage('Push to DockerHub') {
-    steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
-            sh """
-                echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-                docker push ${DOCKER_IMAGE}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}
-            """
+        stage('Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                    sh '''
+                        echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+                        docker push ${DOCKER_IMAGE}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}
+                    '''
+                }
+            }
         }
-    }
-}
-
     }
 
     post {
         success {
-            echo "Pipeline for branch ${env.BRANCH_NAME} completed successfully!"
+            echo "✅ Pipeline for branch ${env.BRANCH_NAME} completed successfully!"
         }
         failure {
-            echo "Pipeline failed for branch ${env.BRANCH_NAME}."
+            echo "❌ Pipeline failed for branch ${env.BRANCH_NAME}."
         }
     }
 }
