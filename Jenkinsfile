@@ -17,8 +17,8 @@ pipeline {
             steps {
                 sh '''
                  # Install required system package
-                   sudo apt-get update
-                   sudo apt-get install -y python3.13.5-venv
+                    apt-get update
+                    apt-get install -y python3-venv
                 python3 -m venv virtual
                 source virtual/bin/activate
                 pip install --upgrade pip
