@@ -20,25 +20,7 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            agent {
-                docker {
-                    image 'python:3.11-slim'
-                    args '-u root'
-                }
-            }
-            steps {
-                unstash 'source' // Retrieve workspace
-                sh '''
-                    apt-get update
-                    apt-get install -y --no-install-recommends gcc libpq-dev
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
-            }
-        }
-
-        stage('Run Tests') {
+        stage('Install Dependencies and Run Tests') {  // COMBINED STAGE
             agent {
                 docker {
                     image 'python:3.11-slim'
@@ -47,15 +29,28 @@ pipeline {
             }
             steps {
                 unstash 'source'
-                sh 'python manage.py test'
+                sh '''
+                    # Install system dependencies
+                    apt-get update
+                    apt-get install -y --no-install-recommends gcc libpq-dev
+                    
+                    # Install Python dependencies
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                    
+                    # Verify Django installation
+                    pip freeze | grep Django
+                    
+                    # Run tests
+                    python manage.py test
+                '''
             }
         }
 
-        // Use Docker agent for image building
         stage('Build Docker Image') {
             agent {
                 docker {
-                    image 'docker:24.0-cli' // Official Docker CLI image
+                    image 'docker:24.0-cli'
                     args '-v /var/run/docker.sock:/var/run/docker.sock -u root'
                 }
             }
@@ -95,6 +90,4 @@ pipeline {
             echo "❌ Pipeline failed for branch ${env.BRANCH_NAME}."
         }
     }
-    
 }
-
