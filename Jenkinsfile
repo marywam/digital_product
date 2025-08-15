@@ -31,23 +31,27 @@ pipeline {
             }
             steps {
                 unstash 'source'
-                sh '''
+                // Fixed shell script with proper variable handling
+                sh """
                     apt-get update
                     apt-get install -y --no-install-recommends gcc libpq-dev
                     pip install --upgrade pip
                     pip install -r requirements.txt
                     
-                    if [ "${env.BRANCH_NAME}" = "master" ]; then
+                    # Use Jenkins environment variable directly
+                    if [ \"$BRANCH_NAME\" = \"master\" ]; then
                         pip install coverage
                     fi
                     
-                    python manage.py test
+                    # Run tests with verbosity for debugging
+                    python manage.py test --verbosity=2
                     
-                    if [ "${env.BRANCH_NAME}" = "master" ]; then
+                    if [ \"$BRANCH_NAME\" = \"master\" ]; then
                         coverage run --source='.' manage.py test
                         coverage xml
                     fi
-                '''
+                """
+                // Archive test results for all branches
                 junit '**/test-reports/*.xml' 
                 
                 script {
@@ -131,14 +135,22 @@ pipeline {
                 }
             }
         }
+        
+        // New stage for cleanup with agent context
+        stage('Cleanup Docker Resources') {
+            agent any
+            when {
+                expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
+            }
+            steps {
+                sh 'docker system prune -f || true'
+            }
+        }
     }
 
     post {
-        always {
-            sh 'docker system prune -f || true'
-        }
         success {
-            script {  // FIXED: Added script block
+            script {
                 echo "✅ Pipeline for ${env.BRANCH_NAME} succeeded!"
                 if (env.BRANCH_NAME == 'master') {
                     emailext (
@@ -146,13 +158,13 @@ pipeline {
                         body: "Production deployment completed successfully.\n\n" +
                               "Docker Image: ${DOCKER_IMAGE}:${PROD_TAG}\n" +
                               "Build URL: ${env.BUILD_URL}",
-                        to: 'your-email@example.com'  // ADD YOUR EMAIL
+                          // ADD YOUR EMAIL
                     )
                 }
             }
         }
         failure {
-            script {  // FIXED: Added script block
+            script {
                 echo "❌ Pipeline failed for ${env.BRANCH_NAME}!"
                 if (env.BRANCH_NAME == 'master') {
                     emailext (
@@ -160,7 +172,7 @@ pipeline {
                         body: "Production deployment failed. Immediate attention required!\n\n" +
                               "Build URL: ${env.BUILD_URL}\n" +
                               "Logs: ${env.BUILD_URL}console",
-                        to: 'your-email@example.com'  // ADD YOUR EMAIL
+                          // ADD YOUR EMAIL
                     )
                 }
             }
