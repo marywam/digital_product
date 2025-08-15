@@ -4,6 +4,8 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKER_IMAGE = "marywam/digital_product"
         PROD_TAG = "prod-${env.BUILD_NUMBER}"
+        // Add this environment variable for test reports
+        TEST_REPORTS_DIR = "test-reports"
     }
 
     stages {
@@ -31,32 +33,39 @@ pipeline {
             }
             steps {
                 unstash 'source'
-                // Fixed shell script with proper variable handling
                 sh """
+                    # Create test reports directory
+                    mkdir -p ${env.TEST_REPORTS_DIR}
+                    
                     apt-get update
                     apt-get install -y --no-install-recommends gcc libpq-dev
                     pip install --upgrade pip
                     pip install -r requirements.txt
+                    
+                    # Install required test packages
+                    pip install pytest pytest-django pytest-cov pytest-xdist
+                    pip install junitxml
                     
                     # Use Jenkins environment variable directly
                     if [ \"$BRANCH_NAME\" = \"master\" ]; then
                         pip install coverage
                     fi
                     
-                    # Run tests with verbosity for debugging
-                    python manage.py test --verbosity=2
+                    # Run tests with JUnit report generation
+                    PYTEST_ADDOPTS="--junitxml=${env.TEST_REPORTS_DIR}/junit.xml" python -m pytest
                     
                     if [ \"$BRANCH_NAME\" = \"master\" ]; then
-                        coverage run --source='.' manage.py test
-                        coverage xml
+                        # Generate coverage report
+                        coverage run --source='.' -m pytest
+                        coverage xml -o ${env.TEST_REPORTS_DIR}/coverage.xml
                     fi
                 """
                 // Archive test results for all branches
-                junit '**/test-reports/*.xml' 
+                junit "${env.TEST_REPORTS_DIR}/junit.xml" 
                 
                 script {
                     if (env.BRANCH_NAME == 'master') {
-                        cobertura coberturaReportFile: 'coverage.xml'
+                        cobertura coberturaReportFile: "${env.TEST_REPORTS_DIR}/coverage.xml"
                     }
                 }
             }
@@ -136,7 +145,7 @@ pipeline {
             }
         }
         
-        // New stage for cleanup with agent context
+        // Cleanup Docker resources
         stage('Cleanup Docker Resources') {
             agent any
             when {
@@ -158,7 +167,7 @@ pipeline {
                         body: "Production deployment completed successfully.\n\n" +
                               "Docker Image: ${DOCKER_IMAGE}:${PROD_TAG}\n" +
                               "Build URL: ${env.BUILD_URL}",
-                          // ADD YOUR EMAIL
+                        to: 'maryannewambui0124@gmail.com'  // ADD YOUR EMAIL HERE
                     )
                 }
             }
@@ -172,7 +181,7 @@ pipeline {
                         body: "Production deployment failed. Immediate attention required!\n\n" +
                               "Build URL: ${env.BUILD_URL}\n" +
                               "Logs: ${env.BUILD_URL}console",
-                          // ADD YOUR EMAIL
+                        to: 'maryannewambui0124@gmail.com'  // ADD YOUR EMAIL HERE
                     )
                 }
             }
