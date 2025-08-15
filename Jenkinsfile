@@ -15,8 +15,10 @@ pipeline {
                     args '-u root'
                 }
             }
-            steps {
-                git branch: "${env.BRANCH_NAME}", url: 'https://github.com/marywam/digital_product.git'
+          steps {
+                git branch: "${env.BRANCH_NAME}", 
+                     url: 'https://github.com/marywam/digital_product.git',
+                     credentialsId: 'github-credentials'  // ADD YOUR CREDENTIALS ID
                 stash name: 'source', includes: '**'
             }
         }
@@ -172,5 +174,5 @@ pipeline {
             }
         }
     }
-    
+
 }
